@@ -30,19 +30,40 @@ jobs:
           CODE_SIGNING_REQUIRED=NO
           COMPILER_INDEX_STORE_ENABLE=NO
 
-      - name: Package IPA
+      - name: Package IPA and verify app bundle
         shell: bash
         run: |
           set -euo pipefail
-          APP_PATH="build/Build/Products/Release-iphoneos/IL2CPPLens.app"
-          test -d "$APP_PATH"
+          APP_PATH="$(find build -type d -name 'IL2CPPLens.app' -print -quit)"
+          if [[ -z "$APP_PATH" ]]; then
+            echo "No .app bundle was produced. Build output:"
+            find build -maxdepth 8 -type d -name '*.app' -print || true
+            exit 1
+          fi
+          echo "Using app bundle: $APP_PATH"
+          test -f "$APP_PATH/Info.plist"
+          test -f "$APP_PATH/IL2CPPLens"
+          echo "Bundle identifier:"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Info.plist"
+          echo "Bundle contents:"
+          find "$APP_PATH" -maxdepth 2 -print | sort
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
           /usr/bin/zip -qry IL2CPPLens-unsigned.ipa Payload
+          APP_DIR="$(dirname "$APP_PATH")"
+          APP_NAME="$(basename "$APP_PATH")"
+          (cd "$APP_DIR" && /usr/bin/zip -qry "$GITHUB_WORKSPACE/IL2CPPLens-app-bundle.zip" "$APP_NAME")
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: IL2CPPLens-unsigned-ipa
           path: IL2CPPLens-unsigned.ipa
+          if-no-files-found: error
+
+      - name: Upload app bundle for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: IL2CPPLens-app-bundle
+          path: IL2CPPLens-app-bundle.zip
           if-no-files-found: error
