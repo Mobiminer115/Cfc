@@ -67,7 +67,7 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
             Text("Chưa có file")
                 .font(.title2.weight(.semibold))
-            Text("Chọn metadata, Mach-O, .app, .ipa hoặc file bất kỳ. App nhận diện theo chữ ký nội dung, không phụ thuộc tên file.")
+            Text("Chọn metadata, Mach-O, .ipa, .zip hoặc file bất kỳ. Nếu là thư mục .app, hãy nén ZIP trước. App nhận diện theo chữ ký nội dung, không phụ thuộc tên file.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal)
