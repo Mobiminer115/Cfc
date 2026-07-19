@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import UIKit
 
 struct ContentView: View {
     @State private var isImporterPresented = false
@@ -42,12 +43,13 @@ struct ContentView: View {
                 }
             }
         }
-        .fileImporter(
-            isPresented: $isImporterPresented,
-            allowedContentTypes: [.data, .zip, .item],
-            allowsMultipleSelection: false,
-            onCompletion: handleImport
-        )
+        .sheet(isPresented: $isImporterPresented) {
+            UniversalFilePicker { result in
+                isImporterPresented = false
+                handleImport(result)
+            }
+            .ignoresSafeArea()
+        }
         .alert("Không đọc được file", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
@@ -65,7 +67,7 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
             Text("Chưa có file")
                 .font(.title2.weight(.semibold))
-            Text("Chọn metadata, Mach-O, .app, .ipa hoặc file bất kỳ. App nhận diện theo chữ ký nội dung, không phụ thuộc tên file.")
+            Text("Chọn metadata, Mach-O, .ipa, .zip hoặc file bất kỳ. Nếu là thư mục .app, hãy nén ZIP trước. App nhận diện theo chữ ký nội dung, không phụ thuộc tên file.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal)
@@ -121,17 +123,88 @@ struct ContentView: View {
     private func analyze(url: URL) {
         isBusy = true
         report = nil
-        let didStart = url.startAccessingSecurityScopedResource()
-        defer {
-            if didStart { url.stopAccessingSecurityScopedResource() }
+        errorMessage = nil
+
+        Task {
+            do {
+                let importedReport = try await Task.detached(priority: .userInitiated) {
+                    let didStart = url.startAccessingSecurityScopedResource()
+                    defer {
+                        if didStart { url.stopAccessingSecurityScopedResource() }
+                    }
+
+                    let values = try url.resourceValues(forKeys: [.isRegularFileKey])
+                    guard values.isRegularFile == true else {
+                        throw ImportError.notARegularFile
+                    }
+                    let data = try Data(contentsOf: url, options: [.mappedIfSafe])
+                    return IL2CPPAnalyzer().analyze(
+                        data: data,
+                        inputName: url.lastPathComponent
+                    )
+                }.value
+                report = importedReport
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            isBusy = false
         }
-        do {
-            let data = try Data(contentsOf: url, options: [.mappedIfSafe])
-            report = IL2CPPAnalyzer().analyze(data: data, inputName: url.lastPathComponent)
-        } catch {
-            errorMessage = error.localizedDescription
+    }
+}
+
+private enum ImportError: LocalizedError {
+    case notARegularFile
+
+    var errorDescription: String? {
+        switch self {
+        case .notARegularFile:
+            return "Hãy chọn file Mach-O, global-metadata.dat hoặc IPA/ZIP. Nếu đang chọn thư mục .app, hãy nén nó thành ZIP trước."
         }
-        isBusy = false
+    }
+}
+
+/// Copy mode accepts extensionless binaries and gives the app a local,
+/// readable URL instead of depending on each file provider's open-in-place behavior.
+private struct UniversalFilePicker: UIViewControllerRepresentable {
+    let completion: (Result<[URL], Error>) -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(completion: completion)
+    }
+
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let picker = UIDocumentPickerViewController(
+            forOpeningContentTypes: [.item],
+            asCopy: true
+        )
+        picker.delegate = context.coordinator
+        picker.allowsMultipleSelection = false
+        picker.shouldShowFileExtensions = true
+        return picker
+    }
+
+    func updateUIViewController(
+        _ uiViewController: UIDocumentPickerViewController,
+        context: Context
+    ) {}
+
+    final class Coordinator: NSObject, UIDocumentPickerDelegate {
+        private let completion: (Result<[URL], Error>) -> Void
+
+        init(completion: @escaping (Result<[URL], Error>) -> Void) {
+            self.completion = completion
+        }
+
+        func documentPicker(
+            _ controller: UIDocumentPickerViewController,
+            didPickDocumentsAt urls: [URL]
+        ) {
+            completion(.success(urls))
+        }
+
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+            completion(.failure(CocoaError(.userCancelled)))
+        }
     }
 }
 
