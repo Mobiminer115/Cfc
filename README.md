@@ -8,7 +8,7 @@
 2. Vào **Actions → Build unsigned IPA → Run workflow** (hoặc push vào `main`/`master`).
 3. Tải artifact `IL2CPPLens-unsigned-ipa` ở cuối workflow.
 
-Workflow dùng macOS runner, cài XcodeGen, tạo `.xcodeproj`, build `iphoneos`, rồi đóng `.app` thành `.ipa`.
+Workflow dùng macOS runner, cài XcodeGen, tạo `.xcodeproj` ở format Xcode 15 (tương thích runner Xcode 15.4), build `iphoneos`, rồi đóng `.app` thành `.ipa`.
 
 IPA mặc định là **unsigned** vì repo không nên chứa certificate/provisioning profile. Nó phù hợp để kiểm tra artifact hoặc ký lại bằng công cụ sideload. Muốn cài trực tiếp lên iPhone bình thường, cần thêm signing secrets và bước `xcodebuild -exportArchive` theo Team ID/provisioning profile của bạn.
 

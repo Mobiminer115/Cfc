@@ -2,6 +2,9 @@ name: IL2CPPLens
 
 options:
   bundleIdPrefix: com.il2cpplens
+  # The GitHub runner currently uses Xcode 15.4. Keep the generated
+  # project readable by Xcode 15 instead of XcodeGen's newer default.
+  projectFormat: xcode15_3
   deploymentTarget:
     iOS: "16.0"
   createIntermediateGroups: true
