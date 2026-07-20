@@ -80,8 +80,13 @@ struct IL2CPPAnalyzer {
         let reader = ByteReader(data: data)
 
         if data.count >= 4 {
-            for offset in 0...(data.count - 4) {
-                if reader.u32(at: offset) == 0xFAB11BAF,
+            // Metadata headers are 4-byte aligned. Checking the aligned
+            // positions keeps a 200+ MB Mach-O scan responsive on iPhone,
+            // while accepting both the ordinary and this build's protected
+            // magic values.
+            for offset in stride(from: 0, through: data.count - 4, by: 4) {
+                let magic = reader.u32(at: offset)
+                if (magic == 0xFAB11BAF || magic == 0xEAB11BAF),
                    let metadata = MetadataParser(data: data, baseOffset: offset).parse() {
                     candidates.append(CandidateReport(
                         id: "\(path)|metadata|\(offset)",
