@@ -3,7 +3,8 @@ name: Build unsigned IPA
 on:
   workflow_dispatch:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, agent/protected-il2cpp-header ]
+  pull_request:
 
 jobs:
   build:
